@@ -110,7 +110,7 @@ def load_model():
             sys.exit(2)
     return _model
 
-def preprocess_image(image_path, target_size=(128, 128)):
+def preprocess_image(image_path, target_size=(224, 224)):
     try:
         print(f"DEBUG: Opening image: {image_path}", file=sys.stderr)
         img = Image.open(image_path).convert('RGB')
