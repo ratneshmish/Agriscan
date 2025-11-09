@@ -32,7 +32,9 @@ except Exception as e:
     print(json.dumps({"error": f"Failed to import PIL: {str(e)}"}))
     sys.exit(2)
 
-# Class names
+# -------------------------------
+# CLASS NAMES (Must match training order)
+# -------------------------------
 CLASS_NAMES = [
     'Apple___Apple_scab',
     'Apple___Black_rot',
@@ -74,26 +76,20 @@ CLASS_NAMES = [
     'Tomato___healthy'
 ]
 
-# Model path
+# -------------------------------
+# MODEL PATH (Use only .h5)
+# -------------------------------
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH_KERAS = os.path.join(SCRIPT_DIR, 'trained.model.keras')
-MODEL_PATH_H5 = os.path.join(SCRIPT_DIR, 'trained_model.h5')
+MODEL_PATH = os.path.join(SCRIPT_DIR, 'trained_model.h5')
 
 print(f"DEBUG: Script directory: {SCRIPT_DIR}", file=sys.stderr)
-print(f"DEBUG: Looking for model at: {MODEL_PATH_KERAS}", file=sys.stderr)
-print(f"DEBUG: Model exists: {os.path.exists(MODEL_PATH_KERAS)}", file=sys.stderr)
-
-if os.path.exists(MODEL_PATH_KERAS):
-    MODEL_PATH = MODEL_PATH_KERAS
-elif os.path.exists(MODEL_PATH_H5):
-    MODEL_PATH = MODEL_PATH_H5
-    print(f"DEBUG: Using H5 model instead", file=sys.stderr)
-else:
-    MODEL_PATH = MODEL_PATH_KERAS
+print(f"DEBUG: Looking for model at: {MODEL_PATH}", file=sys.stderr)
+print(f"DEBUG: Model exists: {os.path.exists(MODEL_PATH)}", file=sys.stderr)
 
 _model = None
 
 def load_model():
+    """Load trained model once."""
     global _model
     if _model is None:
         if not os.path.exists(MODEL_PATH):
@@ -110,13 +106,14 @@ def load_model():
             sys.exit(2)
     return _model
 
-def preprocess_image(image_path, target_size=(224, 224)):
+
+def preprocess_image(image_path, target_size=(128, 128)):
+    """Preprocess image: resize, normalize, expand dims."""
     try:
         print(f"DEBUG: Opening image: {image_path}", file=sys.stderr)
         img = Image.open(image_path).convert('RGB')
         img = img.resize(target_size)
-        arr = np.asarray(img, dtype=np.float32)
-        arr = arr / 255.0
+        arr = np.asarray(img, dtype=np.float32) / 255.0
         arr = np.expand_dims(arr, axis=0)
         print(f"DEBUG: Image preprocessed successfully", file=sys.stderr)
         return arr
@@ -125,35 +122,36 @@ def preprocess_image(image_path, target_size=(224, 224)):
         print(json.dumps({"error": error_msg}))
         sys.exit(3)
 
+
 def main():
     parser = argparse.ArgumentParser(description="Plant disease predictor")
     parser.add_argument("--image", type=str, required=True, help="Path to image file")
     args = parser.parse_args()
-    
+
     image_path = args.image
     print(f"DEBUG: Image path argument: {image_path}", file=sys.stderr)
-    
+
     if not os.path.exists(image_path):
         error_msg = f"Image not found: {image_path}"
         print(json.dumps({"error": error_msg}))
         sys.exit(1)
-    
+
     try:
         model = load_model()
-        inp = preprocess_image(image_path, target_size=(128, 128))
-        
+        inp = preprocess_image(image_path, target_size=(128, 128))  
+
         print(f"DEBUG: Making prediction...", file=sys.stderr)
         preds = model.predict(inp, verbose=0)
-        
+
         if preds.ndim == 2:
             probs = preds[0]
         else:
             probs = np.array(preds).ravel()
-        
+
         idx = int(np.argmax(probs))
         confidence = float(round(float(probs[idx]), 4))
         disease = CLASS_NAMES[idx] if idx < len(CLASS_NAMES) else f"class_{idx}"
-        
+
         result = {
             "disease": disease,
             "confidence": confidence
@@ -161,12 +159,13 @@ def main():
         print(f"DEBUG: Prediction complete: {disease} ({confidence})", file=sys.stderr)
         print(json.dumps(result))
         sys.exit(0)
-        
+
     except Exception as e:
         error_msg = f"Prediction error: {str(e)}"
         print(json.dumps({"error": error_msg}))
         print(f"DEBUG: Exception details: {repr(e)}", file=sys.stderr)
         sys.exit(3)
+
 
 if __name__ == "__main__":
     main()
